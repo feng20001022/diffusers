@@ -53,7 +53,7 @@ EXAMPLE_DOC_STRING = """
         >>> images = pipe(
         ...     prompt=prompt, image=init_image, num_inference_steps=4, strength=0.95, guidance_scale=0.0
         ... ).images[0]
-        >>>images.save(./i2i_CogView3Plus.png")
+        >>>images.save("./i2i_CogView3Plus.png")
         ```
 """
 # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img.retrieve_latents
