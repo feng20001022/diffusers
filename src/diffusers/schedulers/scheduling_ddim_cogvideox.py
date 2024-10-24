@@ -339,9 +339,7 @@ class CogVideoXDDIMScheduler(SchedulerMixin, ConfigMixin):
         sigma = sigmas[step_indices].flatten()
         while len(sigma.shape) < len(sample.shape):
             sigma = sigma.unsqueeze(-1)
-        print("sigma", sigma.shape)
-        print("noise", noise.shape)
-        print("sample", sample.shape)
+        
         sample = sigma * noise + (1.0 - sigma) * sample
 
         return sample
