@@ -146,7 +146,7 @@ else:
         "CogVideoXVideoToVideoPipeline",
         "CogVideoXFunControlPipeline",
     ]
-    _import_structure["cogview3"] = ["CogView3PlusPipeline"]
+    _import_structure["cogview3"] = ["CogView3PlusPipeline", "CogView3PlusImg2ImgPipeline"]
     _import_structure["controlnet"].extend(
         [
             "BlipDiffusionControlNetPipeline",
@@ -477,7 +477,7 @@ if TYPE_CHECKING or DIFFUSERS_SLOW_IMPORT:
             CogVideoXPipeline,
             CogVideoXVideoToVideoPipeline,
         )
-        from .cogview3 import CogView3PlusPipeline
+        from .cogview3 import CogView3PlusPipeline, CogView3PlusImg2ImgPipeline
         from .controlnet import (
             BlipDiffusionControlNetPipeline,
             StableDiffusionControlNetImg2ImgPipeline,

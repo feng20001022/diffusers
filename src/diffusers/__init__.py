@@ -1,7 +1,8 @@
 __version__ = "0.31.0.dev0"
 
 from typing import TYPE_CHECKING
-
+from .utils.loading_utils import *
+from .utils.import_utils import *
 from .utils import (
     DIFFUSERS_SLOW_IMPORT,
     OptionalDependencyNotAvailable,

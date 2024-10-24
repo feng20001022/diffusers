@@ -228,8 +228,47 @@ class CogVideoXDDIMScheduler(SchedulerMixin, ConfigMixin):
 
         # setable values
         self.num_inference_steps = None
-        self.timesteps = torch.from_numpy(np.arange(0, num_train_timesteps)[::-1].copy().astype(np.int64))
+        #self.timesteps = torch.from_numpy(np.arange(0, num_train_timesteps)[::-1].copy().astype(np.int64))
+        timesteps = np.linspace(1, num_train_timesteps, num_train_timesteps, dtype=np.float32)[::-1].copy()
+        timesteps = torch.from_numpy(timesteps).to(dtype=torch.float32)
 
+        sigmas = timesteps / num_train_timesteps
+        #if not use_dynamic_shifting:
+            ## when use_dynamic_shifting is True, we apply the timestep shifting on the fly based on the image resolution
+            #sigmas = shift * sigmas / (1 + (shift - 1) * sigmas)
+
+        self.timesteps = sigmas * num_train_timesteps
+
+        self._step_index = None
+        self._begin_index = None
+
+        self.sigmas = sigmas.to("cpu")  # to avoid too much CPU/GPU communication
+        self.sigma_min = self.sigmas[-1].item()
+        self.sigma_max = self.sigmas[0].item()
+    @property
+    def step_index(self):
+        """
+        The index counter for current timestep. It will increase 1 after each scheduler step.
+        """
+        return self._step_index
+
+    @property
+    def begin_index(self):
+        """
+        The index for the first timestep. It should be set from pipeline with `set_begin_index` method.
+        """
+        return self._begin_index
+
+    # Copied from diffusers.schedulers.scheduling_dpmsolver_multistep.DPMSolverMultistepScheduler.set_begin_index
+    def set_begin_index(self, begin_index: int = 0):
+        """
+        Sets the begin index for the scheduler. This function should be run from pipeline before the inference.
+
+        Args:
+            begin_index (`int`):
+                The begin index for the scheduler.
+        """
+        self._begin_index = begin_index
     def _get_variance(self, timestep, prev_timestep):
         alpha_prod_t = self.alphas_cumprod[timestep]
         alpha_prod_t_prev = self.alphas_cumprod[prev_timestep] if prev_timestep >= 0 else self.final_alpha_cumprod
@@ -256,7 +295,56 @@ class CogVideoXDDIMScheduler(SchedulerMixin, ConfigMixin):
                 A scaled input sample.
         """
         return sample
+    
+    def scale_noise(
+        self,
+        sample: torch.FloatTensor,
+        timestep: Union[float, torch.FloatTensor],
+        noise: Optional[torch.FloatTensor] = None,
+    ) -> torch.FloatTensor:
+        """
+        Forward process in flow-matching
 
+        Args:
+            sample (`torch.FloatTensor`):
+                The input sample.
+            timestep (`int`, *optional*):
+                The current timestep in the diffusion chain.
+
+        Returns:
+            `torch.FloatTensor`:
+                A scaled input sample.
+        """
+        # Make sure sigmas and timesteps have the same device and dtype as original_samples
+        sigmas = self.sigmas.to(device=sample.device, dtype=sample.dtype)
+
+        if sample.device.type == "mps" and torch.is_floating_point(timestep):
+            # mps does not support float64
+            schedule_timesteps = self.timesteps.to(sample.device, dtype=torch.float32)
+            timestep = timestep.to(sample.device, dtype=torch.float32)
+        else:
+            schedule_timesteps = self.timesteps.to(sample.device)
+            timestep = timestep.to(sample.device)
+
+        # self.begin_index is None when scheduler is used for training, or pipeline does not implement set_begin_index
+        if self.begin_index is None:
+            step_indices = [self.index_for_timestep(t, schedule_timesteps) for t in timestep]
+        elif self.step_index is not None:
+            # add_noise is called after first denoising step (for inpainting)
+            step_indices = [self.step_index] * timestep.shape[0]
+        else:
+            # add noise is called before first denoising step to create initial latent(img2img)
+            step_indices = [self.begin_index] * timestep.shape[0]
+
+        sigma = sigmas[step_indices].flatten()
+        while len(sigma.shape) < len(sample.shape):
+            sigma = sigma.unsqueeze(-1)
+        print("sigma", sigma.shape)
+        print("noise", noise.shape)
+        print("sample", sample.shape)
+        sample = sigma * noise + (1.0 - sigma) * sample
+
+        return sample
     def set_timesteps(self, num_inference_steps: int, device: Union[str, torch.device] = None):
         """
         Sets the discrete timesteps used for the diffusion chain (to be run before inference).
