@@ -3,7 +3,8 @@
 2.  clone this repo
 3. cd diffusers and pip install -e ".[torch]"
 4. quickstart with this python code, try changing num_inference_steps and strength to get better results
-'''python
+
+```python
 import os
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import torch
@@ -41,4 +42,4 @@ image = pipe(
 ).images[0]
 
 image.save("CogView3-i2i.png")
-'''
+```
